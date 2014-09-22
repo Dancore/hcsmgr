@@ -1,0 +1,27 @@
+{
+  "links": {
+    "self": "http://se06orgcrowt01:8180/capabilities",
+    "homepage": "http://se06orgcrowt01/"
+  },
+  "key": "hipchat.manager.app",
+  "name": "HipChat Management Add-on",
+  "description": "HipChat connect add-on that manages rooms, users and AD-group2room mappings, etc",
+  "vendor": {
+    "name": "Dan Kopparhed <dan.kopparhed@gmail.com>",
+    "url": "https://linkedin.com/in/dankopparhed"
+  },
+  "capabilities": {
+    "installable": {
+      "allowGlobal": true,
+      "allowRoom": false,
+      "callbackUrl": "http://http://se06orgcrowt01:8180/install",
+    },
+    "hipchatApiConsumer": {
+      "scopes": [
+        "view_group",
+        "admin_group",
+        "send_notification"
+      ]
+    }
+  }
+}
