@@ -1,13 +1,24 @@
 var ldap = require('ldapjs');
-var pcntrl = new ldap.PagedResultsControl({value: {size: 500}});
 var assert = require('assert');
 var argv = process.argv;
 
-var server = "org.example.com"
-var port = 389
-var username = "user"
-var password = 'secret'
-var baseDN = "dc=example,dc=com"
+try { var settings = require(__dirname+"/settings.json"); }
+catch (e) { 
+  console.error('ERROR: failed to load settings.');
+  process.exit()
+}
+try { var settings = require(__dirname+"/settings.local.json"); }
+catch (e) { console.log('WARNING: No local settings found.'); }
+
+var pcntrl = new ldap.PagedResultsControl({value: {size: 500}});
+
+var server = settings.server
+var port = settings.port
+var username = settings.username
+var password = settings.password
+var baseDN =  settings.baseDN
+
+console.log("INFO: Binding to server ldap://"+server+":"+port)
 
 if(argv[2])
   baseDN = "ou="+argv[2]+','+baseDN;
@@ -54,7 +65,7 @@ client.search(baseDN, options, pcntrl, function(err, res) {
 	entry.json.attributes.forEach(function(attr) {
 	  if(attr.type === "description")
 		return console.log('Description: '+ attr.vals[0])
-
+		
 	});
   });
   res.on('searchReference', function(referral) {
