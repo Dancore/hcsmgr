@@ -1,0 +1,31 @@
+{
+  "name": "hcsmgr",
+  "version": "0.0.1",
+  "description": "Doing stuff",
+  "main": "hip.js",
+  "dependencies": {
+    "hipchatter": "~0.1.3",
+    "ldapjs": "~0.7.1",
+    "express": "~4.9.4"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "make test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dancore/hcsmgr"
+  },
+  "keywords": [
+    "hipchat",
+    "group",
+    "room",
+    "ldap",
+    "management"
+  ],
+  "author": "Dan Kopparhed",
+  "license": "GPLv2",
+  "bugs": {
+    "url": "https://github.com/dancore/hcsmgr/issues"
+  }
+}
