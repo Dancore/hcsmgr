@@ -3,5 +3,7 @@
   "port": 389,
   "username": "user",
   "password": "secret",
-  "baseDN": "dc=example,dc=com"
+  "baseDN": "dc=example,dc=com",
+  "capabilities": "capabilities.json",
+  "hcs": "hipchat.com"
 }
