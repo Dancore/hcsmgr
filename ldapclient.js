@@ -1,4 +1,5 @@
 var ldap = require('ldapjs');
+var pcntrl = new ldap.PagedResultsControl({value: {size: 500}});
 var assert = require('assert');
 var argv = process.argv;
 
@@ -7,7 +8,6 @@ var port = 389
 var username = "user"
 var password = 'secret'
 var baseDN = "dc=example,dc=com"
-
 
 if(argv[2])
   baseDN = "ou="+argv[2]+','+baseDN;
@@ -31,16 +31,20 @@ client.bind(username, password, function(err) {
 
 //  filter: '(&(l=Seattle)(email=*@foo.com))',
 var options = {
-  scope: 'sub',
-  sizeLimit: 110,
+  scope: 'sub',		// base|one|sub
+  sizeLimit: 1000,	// max no of entries
+  timeLimit: 30		// in seconds
+
+/* for new pagecontrol, not in released version:
   paged: {
     pageSize: 100,
     pagePause: true
   }
+*/
 };
 
 //client.search(baseDN, function(err, res) {
-client.search(baseDN, options, function(err, res) {
+client.search(baseDN, options, pcntrl, function(err, res) {
   assert.ifError(err);
 
   res.on('searchEntry', function(entry) {
