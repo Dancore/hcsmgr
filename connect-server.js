@@ -1,5 +1,6 @@
 var fs = require('fs');
 var app = require('express')()
+var bodyparser = require('body-parser') 
 if(!process.argv[2]) process.exit();
 var jsonfile = process.argv[2]
 
@@ -15,6 +16,16 @@ var json = tryParseJSON(jsonstr, function(err) {
 });
 //console.log(json)
 
+//app.use(bodyparser.urlencoded({extended: false}))
+
+// create application/json parser
+var jsonParser = bodyparser.json()
+
+// create application/x-www-form-urlencoded parser
+// var urlencodedParser = bodyparser.urlencoded({ extended: false })
+
+
+app.listen(8180)
 app.get("/capabilities", function(req, res) {
   res.writeHead(200, { 'Content-Type': 'application/json' })
   res.end(jsonstr);
@@ -27,7 +38,14 @@ app.get('/', function(req, res) {
   res.write("</body></html>")
   res.end();
 })
-app.listen(8180)
+app.post('/install', jsonParser, function(req, res) {
+  res.writeHead(200, { 'content-type': 'text/plain' })
+//  console.log(req)
+  console.log("body")
+  console.log(req.body)
+//    console.log(req.toString())
+  res.end()
+})
 
 // Better handling & detection of malformed JSON
 function tryParseJSON (jsonString, callb){
