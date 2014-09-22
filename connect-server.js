@@ -1,8 +1,18 @@
+var http = require('http')
 var fs = require('fs');
 var app = require('express')()
 var bodyparser = require('body-parser') 
-if(!process.argv[2]) process.exit();
-var jsonfile = process.argv[2]
+//if(!process.argv[2]) process.exit();
+
+try { var settings = require(__dirname+"/settings.json"); }
+catch (e) {
+  console.error('ERROR: failed to load settings.');
+  process.exit()
+}
+try { var settings = require(__dirname+"/settings.local.json"); }
+catch (e) { console.log('WARNING: No local settings found.'); }
+
+var jsonfile = settings.capabilities
 
 // first read Capabilities Descriptor file (once, then buffer, thus sync)
 var jsonstr = fs.readFileSync(jsonfile, 'utf8')
@@ -45,7 +55,40 @@ app.post('/install', jsonParser, function(req, res) {
   console.log(req.body)
 //    console.log(req.toString())
   res.end()
-})
+
+//  res.on('finish', function() {
+var options = {
+  host: settings.hcs,
+  path: '/v2/oauth/token',
+  port: 80,
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/x-www-form-urlencoded'
+  }
+};
+options["auth"] = req.body.oauthId +':'+ req.body.oauthSecret;
+
+var tokreq = http.request(options, function(res) {
+  console.log('STATUS: ' + res.statusCode);
+  console.log('HEADERS: ' + JSON.stringify(res.headers));
+  res.setEncoding('utf8');
+  res.on('data', function (chunk) {
+    console.log('BODY: ' + chunk);
+  });
+});
+
+tokreq.on('error', function(e) {
+  console.log('problem with request: ' + e.message);
+});
+
+// write data to request body
+tokreq.write("grant_type=client_credentials&scope=admin_group");
+tokreq.end();
+
+//});
+
+
+});
 
 // Better handling & detection of malformed JSON
 function tryParseJSON (jsonString, callb){
