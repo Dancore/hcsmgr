@@ -3,6 +3,7 @@ var fs = require('fs');
 var app = require('express')()
 var bodyparser = require('body-parser') 
 //if(!process.argv[2]) process.exit();
+var Hipchatter = require('hipchatter');
 
 try { var settings = require(__dirname+"/settings.json"); }
 catch (e) {
@@ -73,7 +74,21 @@ var tokreq = http.request(options, function(res) {
   console.log('HEADERS: ' + JSON.stringify(res.headers));
   res.setEncoding('utf8');
   res.on('data', function (chunk) {
-    console.log('BODY: ' + chunk);
+    console.log('token BODY: ' + chunk);
+
+    var json = tryParseJSON(chunk, function(err) {
+	if(err) throw err;
+    });
+
+    console.log("token is: "+json.access_token)
+    console.log("Now accessing "+settings.hcs+"/v2")
+
+    var hipchatter = new Hipchatter(json.access_token, "http://"+settings.hcs+"/v2/");
+    // this will list all of your rooms
+    hipchatter.rooms(function(err, rooms){
+        if(!err) console.log(rooms)
+    });
+
   });
 });
 
@@ -82,7 +97,9 @@ tokreq.on('error', function(e) {
 });
 
 // write data to request body
-tokreq.write("grant_type=client_credentials&scope=admin_group");
+//tokreq.write("grant_type=client_credentials&scope=admin_group admin_room");
+//tokreq.write("grant_type=client_credentials&scope=view_group");
+tokreq.write("grant_type=client_credentials&scope=view_group+admin_room");
 tokreq.end();
 
 //});
