@@ -26,6 +26,12 @@ console.log("INFO: connecting to MongoDB")
 MongoClient.connect('mongodb://127.0.0.1:27017/hcsmgr', function(err, database) {
   if(err) throw err;
   db = database;
+  db.createCollection('groups', function(err, coll){
+	if(err) throw err;
+  });
+  db.createCollection('users', function(err, coll){
+	if(err) throw err;
+  });
 	/*
   var collection = db.collection('test_insert');
   collection.insert({a:2}, function(err, docs) {
@@ -91,7 +97,10 @@ ldap.search(baseDN, options, pcntrl, function(err, res) {
 //    console.log(entry.object);
 //    console.log(entry.json);
 
-    db.groups.save(entry.json);
+    entry.object["_id"]=entry.object.objectGUID
+    db.collection('groups').save( entry.object, {w:1}, function(err, obj) {
+	if(err) throw err;
+    });
 /*
     entry.json.attributes.forEach(function(attr) {
 	switch(attr.type) {
