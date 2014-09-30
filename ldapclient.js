@@ -91,14 +91,24 @@ ldap.search(baseDN, options, pcntrl, function(err, res) {
   res.on('searchEntry', function(entry) {
     entries++;
     if(entries > 2) process.exit(0);
-//    var group = {};
+    var group = {};
     console.log('entry '+entries+': '+entry.dn+' ')
 //    console.log('entry: ' + JSON.stringify(entry.object));
-//    console.log(entry.object);
 //    console.log(entry.json);
+    console.log(entry.object);
 
-    entry.object["_id"]=entry.object.objectGUID
-    db.collection('groups').save( entry.object, {w:1}, function(err, obj) {
+//    entry.object["_id"]=entry.object.objectGUID
+//    entry.object["_id"]=1
+    group["dn"]=entry.object.dn
+    group["cn"]=entry.object.cn
+    group["description"]=entry.object.description
+    group["rev"]=entry.object.uSNChanged
+    group["guid"]=entry.object.objectGUID
+//    group["memberof"]=entry.object.memberOf
+    group["members"]=entry.object.member
+
+//    db.collection('groups').save( entry.object, {w:1}, function(err, obj) {
+    db.collection('groups').save( group, {w:1}, function(err, obj) {
 	if(err) throw err;
     });
 /*
