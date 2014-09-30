@@ -1,9 +1,13 @@
+var MongoClient = require('mongodb').MongoClient
 var http = require('http')
 var fs = require('fs');
 var app = require('express')()
 var bodyparser = require('body-parser') 
 //if(!process.argv[2]) process.exit();
 var Hipchatter = require('hipchatter');
+var db;
+var dboauth;
+var dbtokens;
 
 try { var settings = require(__dirname+"/settings.json"); }
 catch (e) {
@@ -27,6 +31,37 @@ var json = tryParseJSON(jsonstr, function(err) {
 });
 //console.log(json)
 
+console.log("INFO: connecting to MongoDB")
+MongoClient.connect('mongodb://127.0.0.1:27017/hcsmgr', function(err, database) {
+  if(err) throw err;
+  db = database;
+  db.createCollection('groups', function(err, coll){
+        if(err) throw err;
+  });
+  db.createCollection('users', function(err, coll){
+        if(err) throw err;
+  });
+  db.createCollection('oauth', function(err, coll){
+        if(err) throw err;
+  	coll.count(function(err, count) {
+	  console.log("(drop) count "+count)
+	  if(count > 1) coll.drop(function(err) {
+	    coll.save({'oauthId':null}, {w:0})
+	  });
+    	});
+  });
+  db.createCollection('tokens', function(err, coll){
+        if(err) throw err;
+  });
+
+  dbtokens = db.collection('tokens')
+  dboauth = db.collection('oauth')
+  dboauth.find().nextObject(function (err, doc) {
+  	console.log(doc)
+  });
+
+});
+
 //app.use(bodyparser.urlencoded({extended: false}))
 
 // create application/json parser
@@ -34,7 +69,6 @@ var jsonParser = bodyparser.json()
 
 // create application/x-www-form-urlencoded parser
 // var urlencodedParser = bodyparser.urlencoded({ extended: false })
-
 
 app.listen(8180)
 app.get("/capabilities", function(req, res) {
@@ -49,13 +83,54 @@ app.get('/', function(req, res) {
   res.write("</body></html>")
   res.end();
 })
+app.get('/rooms', function(req, res) {
+//  res.writeHead(200, { 'content-type': 'text/plain' })
+  res.write('<html><body>')
+  res.write("Welcome!<br><a href='/capabilities'>cap-desc.json</a>")
+  res.write("</body></html>")
+  res.end();
+})
 app.post('/install', jsonParser, function(req, res) {
   res.writeHead(200, { 'content-type': 'text/plain' })
 //  console.log(req)
   console.log("body")
-  console.log(req.body)
 //    console.log(req.toString())
   res.end()
+
+  dboauth.find().nextObject(function (err, doc) {
+  	req.body["_id"] = doc._id
+  	console.log(req.body)
+  	dboauth.save(req.body, {w:1}, function(err, obj) {
+          if(err) throw err;
+	  getToken()
+  	});
+  });
+
+
+
+});
+
+// Better handling & detection of malformed JSON
+function tryParseJSON (jsonString, callb){
+  try {
+    var o = JSON.parse(jsonString);
+
+    // Handle non-exception-throwing cases:
+    // Neither JSON.parse(false) or JSON.parse(1234) throw errors, hence the type-checking,
+    // but... JSON.parse(null) returns 'null', and typeof null === "object", 
+    // so we must check for that, too.
+    if (o && typeof o === "object" && o !== null) {
+      return o;
+    }
+  }
+  catch (e) { callb(e); }
+
+  return false;
+};
+
+function getToken()
+{
+var tokreq;
 
 //  res.on('finish', function() {
 var options = {
@@ -67,9 +142,11 @@ var options = {
     'Content-Type': 'application/x-www-form-urlencoded'
   }
 };
-options["auth"] = req.body.oauthId +':'+ req.body.oauthSecret;
+//options["auth"] = req.body.oauthId +':'+ req.body.oauthSecret;
+dboauth.find().nextObject(function (err, doc) {
+  options["auth"] = doc.oauthId +':'+ doc.oauthSecret;
 
-var tokreq = http.request(options, function(res) {
+tokreq = http.request(options, function(res) {
   console.log('STATUS: ' + res.statusCode);
   console.log('HEADERS: ' + JSON.stringify(res.headers));
   res.setEncoding('utf8');
@@ -102,25 +179,7 @@ tokreq.on('error', function(e) {
 tokreq.write("grant_type=client_credentials&scope=view_group+admin_room");
 tokreq.end();
 
-//});
+});  //find
 
+} // getToken()
 
-});
-
-// Better handling & detection of malformed JSON
-function tryParseJSON (jsonString, callb){
-  try {
-    var o = JSON.parse(jsonString);
-
-    // Handle non-exception-throwing cases:
-    // Neither JSON.parse(false) or JSON.parse(1234) throw errors, hence the type-checking,
-    // but... JSON.parse(null) returns 'null', and typeof null === "object", 
-    // so we must check for that, too.
-    if (o && typeof o === "object" && o !== null) {
-      return o;
-    }
-  }
-  catch (e) { callb(e); }
-
-  return false;
-};
