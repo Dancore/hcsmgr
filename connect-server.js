@@ -89,6 +89,13 @@ app.get('/rooms', function(req, res) {
   res.write("Welcome!<br><a href='/capabilities'>cap-desc.json</a>")
   res.write("</body></html>")
   res.end();
+
+    var hipchatter = new Hipchatter(json.access_token, "http://"+settings.hcs+"/v2/");
+    // this will list all of your rooms
+    hipchatter.rooms(function(err, rooms){
+//        if(!err) console.log(rooms)
+    });
+
 })
 app.post('/install', jsonParser, function(req, res) {
   res.writeHead(200, { 'content-type': 'text/plain' })
@@ -128,6 +135,7 @@ function tryParseJSON (jsonString, callb){
   return false;
 };
 
+// get a new Token and save it to DB:
 function getToken()
 {
 var tokreq;
@@ -142,7 +150,6 @@ var options = {
     'Content-Type': 'application/x-www-form-urlencoded'
   }
 };
-//options["auth"] = req.body.oauthId +':'+ req.body.oauthSecret;
 dboauth.find().nextObject(function (err, doc) {
   options["auth"] = doc.oauthId +':'+ doc.oauthSecret;
 
@@ -160,11 +167,7 @@ tokreq = http.request(options, function(res) {
     console.log("token is: "+json.access_token)
     console.log("Now accessing "+settings.hcs+"/v2")
 
-    var hipchatter = new Hipchatter(json.access_token, "http://"+settings.hcs+"/v2/");
-    // this will list all of your rooms
-    hipchatter.rooms(function(err, rooms){
-        if(!err) console.log(rooms)
-    });
+    dbtokens.insert(json, {w:1}, function (err, objects) { if(err) throw err; })
 
   });
 });
@@ -174,12 +177,10 @@ tokreq.on('error', function(e) {
 });
 
 // write data to request body
-//tokreq.write("grant_type=client_credentials&scope=admin_group admin_room");
-//tokreq.write("grant_type=client_credentials&scope=view_group");
 tokreq.write("grant_type=client_credentials&scope=view_group+admin_room");
 tokreq.end();
 
 });  //find
 
-} // getToken()
+} //getToken()
 
