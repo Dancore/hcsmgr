@@ -90,7 +90,7 @@ ldap.search(baseDN, options, pcntrl, function(err, res) {
 
   res.on('searchEntry', function(entry) {
     entries++;
-    if(entries > 2) process.exit(0);
+//    if(entries > 2) process.exit(0);
     var group = {};
     console.log('entry '+entries+': '+entry.dn+' ')
 //    console.log('entry: ' + JSON.stringify(entry.object));
@@ -107,10 +107,7 @@ ldap.search(baseDN, options, pcntrl, function(err, res) {
 //    group["memberof"]=entry.object.memberOf
     group["members"]=entry.object.member
 
-//    db.collection('groups').save( entry.object, {w:1}, function(err, obj) {
-    db.collection('groups').save( group, {w:1}, function(err, obj) {
-	if(err) throw err;
-    });
+//    db.collection('groups').save( group, {w:1}, function(err, obj) { if(err) throw err; });
 /*
     entry.json.attributes.forEach(function(attr) {
 	switch(attr.type) {
@@ -119,9 +116,7 @@ ldap.search(baseDN, options, pcntrl, function(err, res) {
 		break;
 	  case "objectGUID":
 		console.log('GUID: '+ attr.vals[0])
-		
 		break;
-
 	}			
 	db.groups.save(
     });
