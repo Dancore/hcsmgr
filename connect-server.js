@@ -59,7 +59,14 @@ MongoClient.connect('mongodb://127.0.0.1:27017/hcsmgr', function(err, database) 
   dboauth.find().nextObject(function (err, doc) {
   	console.log(doc)
   });
-
+/*
+  dbtokens.find().sort({$natural:-1}).limit(1).nextObject(function (err, doc) {
+    console.log(doc)
+  });
+*/
+  dbtokens.find().sort({$natural:1}).each(function (err, doc) {
+    console.log(doc)
+  });
 });
 
 //app.use(bodyparser.urlencoded({extended: false}))
@@ -79,24 +86,56 @@ app.get("/capabilities", function(req, res) {
 app.get('/', function(req, res) {
 //  res.writeHead(200, { 'content-type': 'text/plain' })
   res.write('<html><body>')
-  res.write("Welcome!<br><a href='/capabilities'>cap-desc.json</a>")
+  res.write("HipChat Server Management<br/>")
+  res.write("<a href='/capabilities'>capabilities description [json]</a><br/>")
+  res.write("<a href='/rooms'>List of rooms</a> currently in HipChat Server<br/>")
+  res.write("<a href='/newtoken'>New token</a> force a new token from HCS<br/>")
   res.write("</body></html>")
   res.end();
+})
+app.get("/newtoken", function(req, res) {
+//  res.writeHead(200, { 'Content-Type': 'application/json' })
+//  getToken();
+  dbtokens.find().sort({$natural:1}).each(function (err, doc) {
+    res.end(JSON.stringify(doc))
+  });
 })
 app.get('/rooms', function(req, res) {
-//  res.writeHead(200, { 'content-type': 'text/plain' })
-  res.write('<html><body>')
-  res.write("Welcome!<br><a href='/capabilities'>cap-desc.json</a>")
-  res.write("</body></html>")
-  res.end();
-
-    var hipchatter = new Hipchatter(json.access_token, "http://"+settings.hcs+"/v2/");
+  dbtokens.find().sort({$natural:-1}).limit(1).nextObject(function (err, doc) {
+    if(err) throw err
+    var endpoint = "http://"+settings.hcs+"/v2/"
+    var hipchatter = new Hipchatter(doc.access_token, endpoint);
     // this will list all of your rooms
     hipchatter.rooms(function(err, rooms){
-//        if(!err) console.log(rooms)
+	if(err) {
+	  console.error(err)
+	  res.end(err.name+": "+err.message)
+	  return;
+	}
+	//console.log(rooms)
+	//  res.writeHead(200, { 'content-type': 'text/plain' })
+	res.write('<html><body>')
+	res.write("<a href='/'>Back</a><br/>")
+	res.write("List of rooms in HipChat Server ("+endpoint+")<br/><br/>")
+	rooms.forEach(function (room, i, arr) {
+	  res.write(room.id+" "+room.name+" ")
+	  var url = room.links.self
+	  res.write("<a href='"+url+"'>"+url+"</a>")
+	  res.write("<br/>")
+	});
+	res.write("</body></html>")
+	res.end();
     });
+  });
 
 })
+app.post('/uninstall', jsonParser, function(req, res) {
+  res.writeHead(200, { 'content-type': 'text/plain' })
+  console.log(req)
+  console.log("body")
+//    console.log(req.toString())
+  res.end()
+});
 app.post('/install', jsonParser, function(req, res) {
   res.writeHead(200, { 'content-type': 'text/plain' })
 //  console.log(req)
@@ -112,9 +151,6 @@ app.post('/install', jsonParser, function(req, res) {
 	  getToken()
   	});
   });
-
-
-
 });
 
 // Better handling & detection of malformed JSON
@@ -163,6 +199,10 @@ tokreq = http.request(options, function(res) {
     var json = tryParseJSON(chunk, function(err) {
 	if(err) throw err;
     });
+
+    var T = new Date()
+    var timestamp = T.getTime()
+    json["validto"] = timestamp + json.expires_in
 
     console.log("token is: "+json.access_token)
     console.log("Now accessing "+settings.hcs+"/v2")
