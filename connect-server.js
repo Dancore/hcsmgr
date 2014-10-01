@@ -1,3 +1,5 @@
+var ldapjs = require('ldapjs');
+var assert = require('assert');
 var MongoClient = require('mongodb').MongoClient
 var http = require('http')
 var fs = require('fs');
@@ -18,6 +20,13 @@ try { var settings = require(__dirname+"/settings.local.json"); }
 catch (e) { console.log('WARNING: No local settings found.'); }
 
 var jsonfile = settings.capabilities
+var pcntrl = new ldapjs.PagedResultsControl({value: {size: 500}});
+var ldapserver = settings.server
+var ldapport = settings.port
+var ldapusername = settings.username
+var ldappassword = settings.password
+var baseDN =  settings.baseDN
+var ldap = ldapjs.createClient({url: 'ldap://'+ldapserver+':'+ldapport});
 
 // first read Capabilities Descriptor file (once, then buffer, thus sync)
 var jsonstr = fs.readFileSync(jsonfile, 'utf8')
@@ -85,11 +94,18 @@ app.get("/capabilities", function(req, res) {
 })
 app.get('/', function(req, res) {
 //  res.writeHead(200, { 'content-type': 'text/plain' })
+  var form1 =
+  '<form method="post" action="/ldapsearch">' +
+  'Search: <input name="input1"><br>' +
+  '<input type="submit">' +
+  '</form>';
+
   res.write('<html><body>')
   res.write("HipChat Server Management<br/>")
   res.write("<a href='/capabilities'>capabilities description [json]</a><br/>")
   res.write("<a href='/rooms'>List of rooms</a> currently in HipChat Server<br/>")
   res.write("<a href='/newtoken'>New token</a> force a new token from HCS<br/>")
+  res.write(form1)
   res.write("</body></html>")
   res.end();
 })
@@ -129,10 +145,27 @@ app.get('/rooms', function(req, res) {
   });
 
 })
+app.post('/ldapsearch', jsonParser, function(req, res) {
+  res.writeHead(200, { 'content-type': 'text/plain' })
+
+  console.log("INFO: Binding to server ldap://"+ldapserver+":"+ldapport)
+  ldap.bind(ldapusername, ldappassword, function(err) {
+    if(err) {
+      console.log(err);
+    } else {
+      console.log('authenticated');
+    }
+    getgroups(function (err, group) {
+	res.write(JSON.stringify(group)+"<br/>")
+    });
+  });
+
+//  res.end()
+});
 app.post('/uninstall', jsonParser, function(req, res) {
   res.writeHead(200, { 'content-type': 'text/plain' })
-  console.log(req)
   console.log("body")
+  console.log(req)
 //    console.log(req.toString())
   res.end()
 });
@@ -224,3 +257,56 @@ tokreq.end();
 
 } //getToken()
 
+
+
+function getgroups(callback)
+{
+var entries = 0
+
+var options = {
+  scope: 'sub'		// base|one|sub
+ ,sizeLimit: 1000	// max no of entries
+ ,timeLimit: 30		// in seconds
+ ,filter: '(&(objectClass=group)(member=*))'
+// ,attributes: 'cn, member'
+};
+
+ldap.search(baseDN, options, pcntrl, function(err, res) {
+  assert.ifError(err);
+
+  res.on('searchEntry', function(entry) {
+    entries++;
+//    if(entries > 2) process.exit(0);
+    var group = {};
+//    console.log('entry '+entries+': '+entry.dn+' ')
+//    console.log('entry: ' + JSON.stringify(entry.object));
+//    console.log(entry.json);
+//    console.log(entry.object);
+
+    group["dn"]=entry.object.dn
+    group["cn"]=entry.object.cn
+    group["description"]=entry.object.description
+    group["rev"]=entry.object.uSNChanged
+    group["guid"]=entry.object.objectGUID
+//    group["memberof"]=entry.object.memberOf
+    group["members"]=entry.object.member
+    callback(null, group)
+  });
+  res.on('searchReference', function(referral) {
+    console.log('referral: ' + referral.uris.join());
+  });
+  res.on('error', function(err) {
+    console.error('error: ' + err.message);
+  });
+  res.on('end', function(result) {
+    console.log('status: ' + result.status);
+    console.log('Found ' + entries +' entries');
+  });
+  res.on('page', function (res, cb) {
+    // call 'cb' when processing complete for a page
+//    asyncWaitForProcessing(cb);
+    console.log('status: ' + result.status);
+  });
+}); //ldap.search
+
+} //getgroups()
