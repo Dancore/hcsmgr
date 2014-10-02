@@ -145,9 +145,9 @@ app.get('/rooms', function(req, res) {
   });
 
 })
-app.post('/ldapsearch', jsonParser, function(req, res) {
-  res.writeHead(200, { 'content-type': 'text/plain' })
-
+app.post('/ldapsearch', bodyparser.urlencoded({extended: false}), function(req, res) {
+  res.writeHead(200, { 'content-type': 'text/html' })
+  console.log(req.body)
   console.log("INFO: Binding to server ldap://"+ldapserver+":"+ldapport)
   ldap.bind(ldapusername, ldappassword, function(err) {
     if(err) {
@@ -155,19 +155,25 @@ app.post('/ldapsearch', jsonParser, function(req, res) {
     } else {
       console.log('authenticated');
     }
-    getgroups(function (err, group) {
-	res.write(JSON.stringify(group)+"<br/>")
+    getgroups(req.body.input1, function (event, item) {
+	switch(event) {
+	case null:
+	  console.log(item)
+	  res.write(JSON.stringify(item)+"<br/>")
+	  break;
+	case "END":
+	  console.log(item)
+	  res.end()
+	  break;
+	}
     });
   });
 
-//  res.end()
 });
-app.post('/uninstall', jsonParser, function(req, res) {
+app.delete('/install/:oaid', function(req, res) {
   res.writeHead(200, { 'content-type': 'text/plain' })
-  console.log("body")
-  console.log(req)
-//    console.log(req.toString())
   res.end()
+  console.log("Uninstall request with OAuthID: "+req.params.oaid)
 });
 app.post('/install', jsonParser, function(req, res) {
   res.writeHead(200, { 'content-type': 'text/plain' })
@@ -259,7 +265,7 @@ tokreq.end();
 
 
 
-function getgroups(callback)
+function getgroups(filter, callback)
 {
 var entries = 0
 
@@ -267,9 +273,10 @@ var options = {
   scope: 'sub'		// base|one|sub
  ,sizeLimit: 1000	// max no of entries
  ,timeLimit: 30		// in seconds
- ,filter: '(&(objectClass=group)(member=*))'
+// ,filter: '(&(objectClass=group)(member=*))'
 // ,attributes: 'cn, member'
 };
+options["filter"] = "("+filter+")";
 
 ldap.search(baseDN, options, pcntrl, function(err, res) {
   assert.ifError(err);
@@ -297,15 +304,19 @@ ldap.search(baseDN, options, pcntrl, function(err, res) {
   });
   res.on('error', function(err) {
     console.error('error: ' + err.message);
+    callback(err)
   });
   res.on('end', function(result) {
     console.log('status: ' + result.status);
+    console.log(result);
     console.log('Found ' + entries +' entries');
+    callback("END", entries)
   });
   res.on('page', function (res, cb) {
     // call 'cb' when processing complete for a page
 //    asyncWaitForProcessing(cb);
     console.log('status: ' + result.status);
+    callback("PAGE", result)
   });
 }); //ldap.search
 
