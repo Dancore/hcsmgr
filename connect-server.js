@@ -11,6 +11,17 @@ var db;
 var dboauth;
 var dbtokens;
 
+/*
+var test = new Error('testerr'); var test2;
+console.log(test.constructor)
+console.log(test.message)
+console.log("typeof " + typeof(test))
+console.log("typeof " + typeof(test2))
+console.log("typeof " + typeof('test'))
+if(test.constructor === Object) console.log(' is obj ')
+process.exit()
+*/
+
 try { var settings = require(__dirname+"/settings.json"); }
 catch (e) {
   console.error('ERROR: failed to load settings.');
@@ -27,6 +38,14 @@ var ldapusername = settings.username
 var ldappassword = settings.password
 var baseDN =  settings.baseDN
 var ldap = ldapjs.createClient({url: 'ldap://'+ldapserver+':'+ldapport});
+
+console.log("INFO: Binding to server ldap://"+ldapserver+":"+ldapport)
+ldap.bind(ldapusername, ldappassword, function(err) {
+  if(err)
+    console.log(err);
+  else
+    console.log('LDAP authenticated');
+});
 
 // first read Capabilities Descriptor file (once, then buffer, thus sync)
 var jsonstr = fs.readFileSync(jsonfile, 'utf8')
@@ -68,11 +87,6 @@ MongoClient.connect('mongodb://127.0.0.1:27017/hcsmgr', function(err, database) 
   dboauth.find().nextObject(function (err, doc) {
   	console.log(doc)
   });
-/*
-  dbtokens.find().sort({$natural:-1}).limit(1).nextObject(function (err, doc) {
-    console.log(doc)
-  });
-*/
   dbtokens.find().sort({$natural:1}).each(function (err, doc) {
     console.log(doc)
   });
@@ -96,7 +110,9 @@ app.get('/', function(req, res) {
 //  res.writeHead(200, { 'content-type': 'text/plain' })
   var form1 =
   '<form method="post" action="/ldapsearch">' +
-  'Search: <input name="input1"><br>' +
+  'AD search:<br/>' +
+  'Group (cn): <input name="input1">' +
+  'or User (name): <input name="input2"><br/>' +
   '<input type="submit">' +
   '</form>';
 
@@ -143,32 +159,36 @@ app.get('/rooms', function(req, res) {
 	res.end();
     });
   });
-
 })
 app.post('/ldapsearch', bodyparser.urlencoded({extended: false}), function(req, res) {
   res.writeHead(200, { 'content-type': 'text/html' })
+  console.log("req body: ")
   console.log(req.body)
-  console.log("INFO: Binding to server ldap://"+ldapserver+":"+ldapport)
-  ldap.bind(ldapusername, ldappassword, function(err) {
-    if(err) {
-      console.log(err);
-    } else {
-      console.log('authenticated');
-    }
-    getgroups(req.body.input1, function (event, item) {
-	switch(event) {
-	case null:
+  var filter, basedn = baseDN;
+  if(req.body.input1.length > 0) {
+	filter = '(&(objectclass=group)(cn=*'+req.body.input1+'*)';
+  }
+  else if(req.body.input2.length > 0) {
+	filter = '(&(objectclass=user)'
+	+'(|(sn=*'+req.body.input2+'*)(givenName=*'+req.body.input2+'*)(sAMAccountName=*'+req.body.input2+'*)(mail=*'+req.body.input2+'*))'
+	+')';
+  }
+  ldapsearch(basedn, filter, function (event, item) {
+//  	console.log("typeof: "+typeof(event))
+    switch(event) {
+	case 'ITEM':
 	  console.log(item)
 	  res.write(JSON.stringify(item)+"<br/>")
 	  break;
-	case "END":
-	  console.log(item)
+	case 'END':
+	  console.log(" END "); //console.log(item)
 	  res.end()
 	  break;
-	}
-    });
+	default:
+	  console.log(event.name+": "+event.message)
+	  res.end(event.name+": "+event.message)
+    }
   });
-
 });
 app.delete('/install/:oaid', function(req, res) {
   res.writeHead(200, { 'content-type': 'text/plain' })
@@ -264,40 +284,44 @@ tokreq.end();
 } //getToken()
 
 
-
-function getgroups(filter, callback)
+function ldapsearch(basedn, filter, callback)
 {
 var entries = 0
+if(!filter || filter.length < 1) return callback(new Error("No filter specified"));
+if(!basedn || basedn.length < 1) return callback(new Error("No baseDN specified"));
+if(!ldap) return callback(new Error("LDAP server not bound"));
 
 var options = {
   scope: 'sub'		// base|one|sub
  ,sizeLimit: 1000	// max no of entries
- ,timeLimit: 30		// in seconds
-// ,filter: '(&(objectClass=group)(member=*))'
-// ,attributes: 'cn, member'
+ ,timeLimit: 10		// in seconds
+ ,sizeLimit: 50		// max nr of entries (dft: unlimited)
+ ,attributes: ['dn', 'cn', 'description', 'uSNChanged', 'objectGUID', 'sAMAccountName', 'mail', 'member']
 };
-options["filter"] = "("+filter+")";
+options["filter"] = filter;
 
-ldap.search(baseDN, options, pcntrl, function(err, res) {
+ldap.search(basedn, options, pcntrl, function(err, res) {
   assert.ifError(err);
 
   res.on('searchEntry', function(entry) {
     entries++;
 //    if(entries > 2) process.exit(0);
-    var group = {};
+    var item = {};
 //    console.log('entry '+entries+': '+entry.dn+' ')
 //    console.log('entry: ' + JSON.stringify(entry.object));
 //    console.log(entry.json);
 //    console.log(entry.object);
 
-    group["dn"]=entry.object.dn
-    group["cn"]=entry.object.cn
-    group["description"]=entry.object.description
-    group["rev"]=entry.object.uSNChanged
-    group["guid"]=entry.object.objectGUID
-//    group["memberof"]=entry.object.memberOf
-    group["members"]=entry.object.member
-    callback(null, group)
+    item["dn"]=entry.object.dn
+    item["cn"]=entry.object.cn
+    item["description"]=entry.object.description
+    item["rev"]=entry.object.uSNChanged
+    item["guid"]=entry.object.objectGUID
+//    item["memberof"]=entry.object.memberOf
+    item["accountid"]=entry.object.sAMAccountName
+    item["mail"]=entry.object.mail
+    item["members"]=entry.object.member
+    callback("ITEM", item)
   });
   res.on('searchReference', function(referral) {
     console.log('referral: ' + referral.uris.join());
@@ -307,17 +331,18 @@ ldap.search(baseDN, options, pcntrl, function(err, res) {
     callback(err)
   });
   res.on('end', function(result) {
-    console.log('status: ' + result.status);
-    console.log(result);
+    console.log('END status: ' + result.status);
+//    console.log(result);
     console.log('Found ' + entries +' entries');
-    callback("END", entries)
+    result["entries"] = entries
+    callback("END", result)
   });
   res.on('page', function (res, cb) {
     // call 'cb' when processing complete for a page
 //    asyncWaitForProcessing(cb);
-    console.log('status: ' + result.status);
+    console.log('PAGE status: ' + result.status);
     callback("PAGE", result)
   });
 }); //ldap.search
 
-} //getgroups()
+} //ldapsearch()
