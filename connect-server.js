@@ -117,22 +117,74 @@ app.get("/capabilities", function(req, res) {
 app.get('/', function(req, res) {
 //  res.writeHead(200, { 'content-type': 'text/plain' })
   var form1 =
-  '<form method="post" action="/ldapsearch">' +
   'AD search:<br/>' +
-  'Group (cn): <input name="input1">' +
-  'or User (name): <input name="input2"><br/>' +
-  '<input type="submit">' +
+  '<form method="post" action="/ldapsearch">' +
+  'Group (cn): <input name="input1"/>' +
+  ' or User (name): <input name="input2"/>' +
+  '<input type="submit" value="Search"/>' +
   '</form>';
+
+  var form2 =
+  'AD-group to HipChat room mapping:<br/>' +
+//  'Warning: Function overwrites configuration for the room, if any<br/>' +
+  '<form method="post" action="/groupmap">' +
+  'Map Group (DN): <input name="input1"/>' +
+  ' to Room (Name): <input name="input2"/>' +
+  '<input type="submit" value="Add"/>' +
+  '</form><br/>';
 
   res.write('<html><body>')
   res.write("HipChat Server Management<br/>")
   res.write("<a href='/capabilities'>capabilities description [json]</a><br/>")
   res.write("<a href='/rooms'>List of rooms</a> currently in HipChat Server<br/>")
-  res.write("<a href='/newtoken'>New token</a> force a new token from HCS<br/>")
+  res.write("<a href='/newtoken'>New token</a> force a new token from HCS<br/><br/>")
   res.write(form1)
+  res.write(form2)
   res.write("</body></html>")
   res.end();
 })
+app.post('/groupmap', bodyparser.urlencoded({extended: false}), function(req, res) {
+  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+  console.log("req body: ")
+  console.log(req.body)
+  var inp1 = req.body.input1, inp2 = req.body.input2;
+
+  res.write('<a href="/">Back</a><br/>')
+  res.write("<table border='1'><tr><td>Nr</td><td>CN</td><td>"
+	+"AccountID</td><td>Mail</td><td>DN</td></tr></table>");
+  if(inp1.length < 1 || inp2.length < 1) {
+    res.write('No group/room specified<br/>')
+    return res.end();
+  }
+//  var dn = ldapjs.parseDN(inp1)
+//  dn = dn.toString()
+
+  res.write('trying...<br/>')
+  var filter = '(&(objectclass=group)(member=*))';
+
+  ldapsearch(dn, filter, 1, function (event, item) {
+    console.log("typeof: "+typeof(event))
+    switch(event) {
+	case 'ITEM':
+//	  console.log("ITEM: "); console.log(item)
+	  res.write("<table border='1'><tr><td>"+item.entry+"</td><td>"+item.cn+"</td><td>"
+		+item.accountid+"</td><td>"+item.mail+"</td><td>"+item.dn
+		+"</td></tr></table>");
+	  break;
+	case 'END':
+//	  console.log(" END "); //console.log(item)
+	  res.write("Found "+item.entry+" entries<br/>")
+	  break;
+	default:
+	  console.log(event.name+" yo: "+event.message)
+	  res.end(event.name+": "+event.message)
+    }
+  });
+
+//  db.groups.insert
+
+  res.end();
+});
 app.get("/newtoken", function(req, res) {
 //  res.writeHead(200, { 'Content-Type': 'application/json' })
 //  getToken();
@@ -187,7 +239,7 @@ app.post('/ldapsearch', bodyparser.urlencoded({extended: false}), function(req, 
   res.write("<table border='1'><tr><td>Nr</td><td>CN</td><td>"
 	+"AccountID</td><td>Mail</td><td>DN</td></tr></table>");
 
-  ldapsearch(basedn, filter, function (event, item) {
+  ldapsearch(basedn, filter, null, function (event, item) {
 //  	console.log("typeof: "+typeof(event))
     switch(event) {
 	case 'ITEM':
@@ -302,7 +354,7 @@ tokreq.end();
 } //getToken()
 
 
-function ldapsearch(basedn, filter, callback)
+function ldapsearch(basedn, filter, limit, callback)
 {
 var entries = 0
 if(!filter || filter.length < 1) return callback(new Error("No filter specified"));
@@ -317,6 +369,7 @@ var options = {
  ,attributes: ['dn','cn','description','uSNChanged','objectGUID','sAMAccountName','mail','member']
 };
 options["filter"] = filter;
+if(limit) options["sizeLimit"] = limit
 
 //ldap.search(basedn, options, pcntrl, function(err, res) {
 ldap.search(basedn, options, function(err, res) {
@@ -341,27 +394,27 @@ ldap.search(basedn, options, function(err, res) {
     item["mail"]=entry.object.mail
     item["members"]=entry.object.member
     item["entry"]=entries
-    callback("ITEM", item)
+    return callback("ITEM", item)
   });
   res.on('searchReference', function(referral) {
     console.log('referral: ' + referral.uris.join());
   });
   res.on('error', function(err) {
     console.error('error: ' + err.message);
-    callback(err)
+    return callback(err)
   });
   res.on('end', function(result) {
 //    console.log('END status: ' + result.status);
 //    console.log(result);
 //    console.log('Found ' + entries +' entries');
     result["entry"] = entries
-    callback("END", result)
+    return callback("END", result)
   });
   res.on('page', function (res, cb) {
     // call 'cb' when processing complete for a page
 //    asyncWaitForProcessing(cb);
     console.log('PAGE status: ' + result.status);
-    callback("PAGE", result)
+    return callback("PAGE", result)
   });
 }); //ldap.search
 
