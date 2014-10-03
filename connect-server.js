@@ -12,7 +12,15 @@ var dboauth;
 var dbtokens;
 
 /*
+var StringDecoder = require('string_decoder').StringDecoder;
+var decoder = new StringDecoder('utf8');
+var cent = new Buffer([0xC2, 0xA2]);
+console.log(cent.toString());
+console.log(decoder.write(cent));
+var euro = new Buffer([0xE2, 0x82, 0xAC]);
 var test = new Error('testerr'); var test2;
+console.log(euro.toString());
+console.log(decoder.write(euro));
 console.log(test.constructor)
 console.log(test.message)
 console.log("typeof " + typeof(test))
@@ -31,7 +39,7 @@ try { var settings = require(__dirname+"/settings.local.json"); }
 catch (e) { console.log('WARNING: No local settings found.'); }
 
 var jsonfile = settings.capabilities
-var pcntrl = new ldapjs.PagedResultsControl({value: {size: 500}});
+//var pcntrl = new ldapjs.PagedResultsControl({value: {size: 500}});
 var ldapserver = settings.server
 var ldapport = settings.port
 var ldapusername = settings.username
@@ -161,27 +169,37 @@ app.get('/rooms', function(req, res) {
   });
 })
 app.post('/ldapsearch', bodyparser.urlencoded({extended: false}), function(req, res) {
-  res.writeHead(200, { 'content-type': 'text/html' })
-  console.log("req body: ")
-  console.log(req.body)
-  var filter, basedn = baseDN;
-  if(req.body.input1.length > 0) {
-	filter = '(&(objectclass=group)(cn=*'+req.body.input1+'*)';
+  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+//  console.log("req body: ")
+//  console.log(req.body)
+  var filter, inp = req.body.input1, inp2 = req.body.input2;
+  var basedn = baseDN;
+
+  if(inp.length > 0) {
+	filter = '(&(objectclass=group)(member=*)(|(cn='+inp+')(displayname='+inp+')))';
   }
-  else if(req.body.input2.length > 0) {
+  else if(inp2.length > 0) {
 	filter = '(&(objectclass=user)'
-	+'(|(sn=*'+req.body.input2+'*)(givenName=*'+req.body.input2+'*)(sAMAccountName=*'+req.body.input2+'*)(mail=*'+req.body.input2+'*))'
+	+'(|(sn='+inp2+')(givenName='+inp2+')(sAMAccountName='+inp2+')(mail='+inp2+'))'
 	+')';
   }
+  res.write('<a href="/">Back</a><br/>')
+  res.write("<table border='1'><tr><td>Nr</td><td>CN</td><td>"
+	+"AccountID</td><td>Mail</td><td>DN</td></tr></table>");
+
   ldapsearch(basedn, filter, function (event, item) {
 //  	console.log("typeof: "+typeof(event))
     switch(event) {
 	case 'ITEM':
-	  console.log(item)
-	  res.write(JSON.stringify(item)+"<br/>")
+//	  console.log("ITEM: "); console.log(item)
+//	  res.write(JSON.stringify(item)+"<br/>")
+	  res.write("<table border='1'><tr><td>"+item.entry+"</td><td>"+item.cn+"</td><td>"
+		+item.accountid+"</td><td>"+item.mail+"</td><td>"+item.dn
+		+"</td></tr></table>");
 	  break;
 	case 'END':
-	  console.log(" END "); //console.log(item)
+//	  console.log(" END "); //console.log(item)
+	  res.write("Found "+item.entry+" entries<br/>")
 	  res.end()
 	  break;
 	default:
@@ -296,11 +314,12 @@ var options = {
  ,sizeLimit: 1000	// max no of entries
  ,timeLimit: 10		// in seconds
  ,sizeLimit: 50		// max nr of entries (dft: unlimited)
- ,attributes: ['dn', 'cn', 'description', 'uSNChanged', 'objectGUID', 'sAMAccountName', 'mail', 'member']
+ ,attributes: ['dn','cn','description','uSNChanged','objectGUID','sAMAccountName','mail','member']
 };
 options["filter"] = filter;
 
-ldap.search(basedn, options, pcntrl, function(err, res) {
+//ldap.search(basedn, options, pcntrl, function(err, res) {
+ldap.search(basedn, options, function(err, res) {
   assert.ifError(err);
 
   res.on('searchEntry', function(entry) {
@@ -321,6 +340,7 @@ ldap.search(basedn, options, pcntrl, function(err, res) {
     item["accountid"]=entry.object.sAMAccountName
     item["mail"]=entry.object.mail
     item["members"]=entry.object.member
+    item["entry"]=entries
     callback("ITEM", item)
   });
   res.on('searchReference', function(referral) {
@@ -331,10 +351,10 @@ ldap.search(basedn, options, pcntrl, function(err, res) {
     callback(err)
   });
   res.on('end', function(result) {
-    console.log('END status: ' + result.status);
+//    console.log('END status: ' + result.status);
 //    console.log(result);
-    console.log('Found ' + entries +' entries');
-    result["entries"] = entries
+//    console.log('Found ' + entries +' entries');
+    result["entry"] = entries
     callback("END", result)
   });
   res.on('page', function (res, cb) {
