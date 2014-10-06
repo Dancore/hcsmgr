@@ -71,7 +71,7 @@ console.log("INFO: connecting to MongoDB")
 MongoClient.connect('mongodb://127.0.0.1:27017/hcsmgr', function(err, database) {
   if(err) throw err;
   db = database;
-  db.createCollection('mappings', function(err, coll){
+  db.createCollection('rooms', function(err, coll){
         if(err) throw err;
   });
   db.createCollection('groups', function(err, coll){
@@ -93,12 +93,16 @@ MongoClient.connect('mongodb://127.0.0.1:27017/hcsmgr', function(err, database) 
         if(err) throw err;
   });
 
+  dbrooms = db.collection('rooms')
+  dbrooms.ensureIndex( {"name": 1}, {unique: true, dropDups: true}, function(err, obj) {
+	if(err) throw err;
+	console.log(obj)
+  });
   dbgroups = db.collection('groups')
   dbgroups.ensureIndex( {"guid": 1}, {unique: true, dropDups: true}, function(err, obj) {
 	if(err) throw err;
 	console.log(obj)
   });
-  dbmaps = db.collection('mappings')
   dbtokens = db.collection('tokens')
   dboauth = db.collection('oauth')
   dboauth.find().nextObject(function (err, doc) {
@@ -182,11 +186,15 @@ app.post('/groupmap', bodyparser.urlencoded({extended: false}), function(req, re
 //	  item["rooms"]=99
 	  updategroup(item, function(err, obj) {
 	    if (err) { 
-		res.write(err.name+": "+err.message)
+		return res.write(err.name+": "+err.message)
 	    } //else {
 
 	    res.write("Added/updated group "+item.cn+"<br/>")
-	    
+	    var room = { "cn": item.cn, "name": inp2 }
+	    updateroom(room, function(err, obj) {
+		if(err) return res.write(err.name+": "+err.message)
+		res.write("Added/updated room "+room.name+"<br/>")
+	    });
 	  });
 
 	//  dbmaps.insert(item.object, {w:1}, function (err, objects) { if(err) throw err; })
@@ -207,34 +215,64 @@ app.post('/groupmap', bodyparser.urlencoded({extended: false}), function(req, re
 
 });
 
+function updateroom(item, callback)
+{
+  dbrooms.insert(item, {w:1}, function (err, obj) { 
+    if(err.code == 11000) {
+	dbrooms.findOne({"name":item.name}, function (err, dup) { 
+	  if(err) throw err;	// err shouldnt happen here... prob
+//	  console.log(dup)
+	  dbrooms.remove({"name":item.name}, {w:1}, function (err, n) {
+		if(err) console.log(err);
+		console.log("Removed "+n+" docs for cn "+item.cn)
+//		item["entry"]=99	//debug
+		dbrooms.insert(item, {w:1}, function (err, obj) {
+		  if(err) throw err;
+		  return callback(null, obj)
+		});
+	  });
+	});
+//	res.write("dup "+ err.name+": "+err.message)
+	console.log("dup "+ err.name+": "+err.message)
+    }
+    else if(err) {
+	console.log(err.name+": "+err.message)
+	console.log(err)
+	return callback(err)
+    }
+    else
+      return callback(null, obj)
+  });
+}
+
 function updategroup(item, callback)
 {
-	  dbgroups.insert(item, {w:1}, function (err, obj) { 
-	    if(err.code == 11000) {
-		dbgroups.findOne({"guid":item.guid}, function (err, dup) { 
-		  if(err) throw err;	// err shouldnt happen here... prob
-//		  console.log(dup)
-		  dbgroups.remove({"guid":item.guid}, {w:1}, function (err, n) {
-			if(err) console.log(err);
-			console.log("Removed "+n+" docs for guid "+item.guid)
-//			item["entry"]=99	//debug
-			dbgroups.insert(item, {w:1}, function (err, obj) {
-			  if(err) throw err;
-			  return callback(null, obj)
-			});
-		  });
+  dbgroups.insert(item, {w:1}, function (err, obj) { 
+    if(err.code == 11000) {
+	dbgroups.findOne({"guid":item.guid}, function (err, dup) { 
+	  if(err) throw err;	// err shouldnt happen here... prob
+//	  console.log(dup)
+	  dbgroups.remove({"guid":item.guid}, {w:1}, function (err, n) {
+		if(err) console.log(err);
+		console.log("Removed "+n+" docs for guid "+item.guid)
+//		item["entry"]=99	//debug
+		dbgroups.insert(item, {w:1}, function (err, obj) {
+		  if(err) throw err;
+		  return callback(null, obj)
 		});
-//		res.write("dup "+ err.name+": "+err.message)
-		console.log("dup "+ err.name+": "+err.message)
-	    }
-	    else if(err) {
-		console.log(err.name+": "+err.message)
-		console.log(err)
-		return callback(err)
-	    }
-	    else
-  	      return callback(null, obj)
 	  });
+	});
+//	res.write("dup "+ err.name+": "+err.message)
+	console.log("dup "+ err.name+": "+err.message)
+    }
+    else if(err) {
+	console.log(err.name+": "+err.message)
+	console.log(err)
+	return callback(err)
+    }
+    else
+      return callback(null, obj)
+  });
 }
 
 app.get("/newtoken", function(req, res) {
