@@ -179,34 +179,18 @@ app.post('/groupmap', bodyparser.urlencoded({extended: false}), function(req, re
 		+item.accountid+"</td><td>"+item.mail+"</td><td>"+item.dn
 		+"</td></tr></table>");
 
-	  dbgroups.insert(item, {w:1}, function (err, obj) { 
-	    if(err.code == 11000) {
-		dbgroups.findOne({"guid":item.guid}, function (err, dup) { 
-		  if(err) throw err;	// err shouldnt happen here... prob
-//		  console.log(dup)
-		  dbgroups.remove({"guid":item.guid}, {w:1}, function (err, n) {
-			if(err) console.log(err);
-			console.log("Removed "+n+" docs for guid "+item.guid)
-//			item["entry"]=99	//debug
-			dbgroups.insert(item, {w:1}, function (err, obj) {
-			  if(err) throw err;
-			  res.write("Updated existing group "+item.cn+"<br/>")
-			});
-		  });
-		});
-//		res.write("dup "+ err.name+": "+err.message)
-		console.log("dup "+ err.name+": "+err.message)
-	    }
-	    else if(err) {
+//	  item["rooms"]=99
+	  updategroup(item, function(err, obj) {
+	    if (err) { 
 		res.write(err.name+": "+err.message)
-		console.log(err.name+": "+err.message)
-		console.log(err)
-	    }
+	    } //else {
 
-//	    console.log(obj._id)
-		//  dbmaps.insert(item.object, {w:1}, function (err, objects) { if(err) throw err; })
-		
+	    res.write("Added/updated group "+item.cn+"<br/>")
+	    
 	  });
+
+	//  dbmaps.insert(item.object, {w:1}, function (err, objects) { if(err) throw err; })
+		
 	  break;
 	case 'END':
 //	  console.log(" END "); //console.log(item)
@@ -222,6 +206,37 @@ app.post('/groupmap', bodyparser.urlencoded({extended: false}), function(req, re
 //  db.groups.insert
 
 });
+
+function updategroup(item, callback)
+{
+	  dbgroups.insert(item, {w:1}, function (err, obj) { 
+	    if(err.code == 11000) {
+		dbgroups.findOne({"guid":item.guid}, function (err, dup) { 
+		  if(err) throw err;	// err shouldnt happen here... prob
+//		  console.log(dup)
+		  dbgroups.remove({"guid":item.guid}, {w:1}, function (err, n) {
+			if(err) console.log(err);
+			console.log("Removed "+n+" docs for guid "+item.guid)
+//			item["entry"]=99	//debug
+			dbgroups.insert(item, {w:1}, function (err, obj) {
+			  if(err) throw err;
+			  return callback(null, obj)
+			});
+		  });
+		});
+//		res.write("dup "+ err.name+": "+err.message)
+		console.log("dup "+ err.name+": "+err.message)
+	    }
+	    else if(err) {
+		console.log(err.name+": "+err.message)
+		console.log(err)
+		return callback(err)
+	    }
+	    else
+  	      return callback(null, obj)
+	  });
+}
+
 app.get("/newtoken", function(req, res) {
 //  res.writeHead(200, { 'Content-Type': 'application/json' })
 //  getToken();
