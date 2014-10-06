@@ -128,8 +128,8 @@ app.get('/', function(req, res) {
   'AD-group to HipChat room mapping:<br/>' +
 //  'Warning: Function overwrites configuration for the room, if any<br/>' +
   '<form method="post" action="/groupmap">' +
-  'Map Group (DN): <input name="input1"/>' +
-  ' to Room (Name): <input name="input2"/>' +
+  'Map Room (Name): <input name="input2" size="20"/><br/>' +
+  ' to Group (DN): <input name="input1" size="100"/>' +
   '<input type="submit" value="Add"/>' +
   '</form><br/>';
 
@@ -153,20 +153,18 @@ app.post('/groupmap', bodyparser.urlencoded({extended: false}), function(req, re
   res.write("<table border='1'><tr><td>Nr</td><td>CN</td><td>"
 	+"AccountID</td><td>Mail</td><td>DN</td></tr></table>");
   if(inp1.length < 1 || inp2.length < 1) {
-    res.write('No group/room specified<br/>')
+    res.write('Room/Group missing<br/>')
     return res.end();
   }
-//  var dn = ldapjs.parseDN(inp1)
-//  dn = dn.toString()
 
-  res.write('trying...<br/>')
+//  res.write('trying...<br/>')
   var filter = '(&(objectclass=group)(member=*))';
 
-  ldapsearch(dn, filter, 1, function (event, item) {
+  ldapsearch(inp1, filter, 1, function (event, item) {
     console.log("typeof: "+typeof(event))
     switch(event) {
 	case 'ITEM':
-//	  console.log("ITEM: "); console.log(item)
+	  console.log("ITEM: "); console.log(item)
 	  res.write("<table border='1'><tr><td>"+item.entry+"</td><td>"+item.cn+"</td><td>"
 		+item.accountid+"</td><td>"+item.mail+"</td><td>"+item.dn
 		+"</td></tr></table>");
@@ -174,16 +172,16 @@ app.post('/groupmap', bodyparser.urlencoded({extended: false}), function(req, re
 	case 'END':
 //	  console.log(" END "); //console.log(item)
 	  res.write("Found "+item.entry+" entries<br/>")
+	  res.end();
 	  break;
 	default:
-	  console.log(event.name+" yo: "+event.message)
+	  console.log(event.name+": "+event.message)
 	  res.end(event.name+": "+event.message)
     }
   });
 
 //  db.groups.insert
 
-  res.end();
 });
 app.get("/newtoken", function(req, res) {
 //  res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -361,6 +359,15 @@ if(!filter || filter.length < 1) return callback(new Error("No filter specified"
 if(!basedn || basedn.length < 1) return callback(new Error("No baseDN specified"));
 if(!ldap) return callback(new Error("LDAP server not bound"));
 
+try {
+  var dn = ldapjs.parseDN(basedn)
+//  dn = dn.toString()
+}
+catch(err) {
+//    console.error('error: ' + err.message);
+    return callback(err)
+}
+
 var options = {
   scope: 'sub'		// base|one|sub
  ,sizeLimit: 1000	// max no of entries
@@ -370,6 +377,7 @@ var options = {
 };
 options["filter"] = filter;
 if(limit) options["sizeLimit"] = limit
+//console.log(options)
 
 //ldap.search(basedn, options, pcntrl, function(err, res) {
 ldap.search(basedn, options, function(err, res) {
@@ -400,7 +408,7 @@ ldap.search(basedn, options, function(err, res) {
     console.log('referral: ' + referral.uris.join());
   });
   res.on('error', function(err) {
-    console.error('error: ' + err.message);
+//    console.error('error: ' + err.message);
     return callback(err)
   });
   res.on('end', function(result) {
