@@ -150,11 +150,29 @@ app.get('/', function(req, res) {
   res.write("HipChat Server Management<br/>")
   res.write("<a href='/capabilities'>capabilities description [json]</a><br/>")
   res.write("<a href='/rooms'>List of rooms</a> currently in HipChat Server<br/>")
+  res.write("<a href='/groupmap'>Show room/group mapping</a><br/>")
   res.write("<a href='/newtoken'>New token</a> force a new token from HCS<br/><br/>")
   res.write(form1)
   res.write(form2)
   res.write("</body></html>")
   res.end();
+})
+app.get('/groupmap', bodyparser.urlencoded({extended: false}), function(req, res) {
+  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+  res.write('<a href="/">Back</a><br/>')
+  res.write("<table border='1'><tr><td>Nr</td><td>CN</td><td>"
+	+"AccountID</td><td>Mail</td><td>DN</td></tr></table>");
+
+  dbrooms.find().sort({name: 1}).each(function(err, room) {
+    if(err) throw err;
+    if(room) {
+  	console.log(room)
+    	res.write("<table border='1'><tr><td>"+room.name+"</td><td>"+room.cn+"</td><td>"
+	  +"</td></tr></table>");
+//	  +item.accountid+"</td><td>"+item.mail+"</td><td>"+item.dn
+    }
+    else res.end()
+  });
 })
 app.post('/groupmap', bodyparser.urlencoded({extended: false}), function(req, res) {
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
