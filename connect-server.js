@@ -218,7 +218,7 @@ app.post('/groupmap', bodyparser.urlencoded({extended: false}), function(req, re
 function updateroom(item, callback)
 {
   dbrooms.insert(item, {w:1}, function (err, obj) { 
-    if(err.code == 11000) {
+    if(err && err.code == 11000) {
 	dbrooms.findOne({"name":item.name}, function (err, dup) { 
 	  if(err) throw err;	// err shouldnt happen here... prob
 //	  console.log(dup)
@@ -248,7 +248,7 @@ function updateroom(item, callback)
 function updategroup(item, callback)
 {
   dbgroups.insert(item, {w:1}, function (err, obj) { 
-    if(err.code == 11000) {
+    if(err && err.code == 11000) {
 	dbgroups.findOne({"guid":item.guid}, function (err, dup) { 
 	  if(err) throw err;	// err shouldnt happen here... prob
 //	  console.log(dup)
