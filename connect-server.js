@@ -71,6 +71,9 @@ console.log("INFO: connecting to MongoDB")
 MongoClient.connect('mongodb://127.0.0.1:27017/hcsmgr', function(err, database) {
   if(err) throw err;
   db = database;
+  db.createCollection('mappings', function(err, coll){
+        if(err) throw err;
+  });
   db.createCollection('groups', function(err, coll){
         if(err) throw err;
   });
@@ -90,6 +93,12 @@ MongoClient.connect('mongodb://127.0.0.1:27017/hcsmgr', function(err, database) 
         if(err) throw err;
   });
 
+  dbgroups = db.collection('groups')
+  dbgroups.ensureIndex( {"guid": 1}, {unique: true, dropDups: true}, function(err, obj) {
+	if(err) throw err;
+	console.log(obj)
+  });
+  dbmaps = db.collection('mappings')
   dbtokens = db.collection('tokens')
   dboauth = db.collection('oauth')
   dboauth.find().nextObject(function (err, doc) {
@@ -150,8 +159,6 @@ app.post('/groupmap', bodyparser.urlencoded({extended: false}), function(req, re
   var inp1 = req.body.input1, inp2 = req.body.input2;
 
   res.write('<a href="/">Back</a><br/>')
-  res.write("<table border='1'><tr><td>Nr</td><td>CN</td><td>"
-	+"AccountID</td><td>Mail</td><td>DN</td></tr></table>");
   if(inp1.length < 1 || inp2.length < 1) {
     res.write('Room/Group missing<br/>')
     return res.end();
@@ -165,14 +172,46 @@ app.post('/groupmap', bodyparser.urlencoded({extended: false}), function(req, re
     switch(event) {
 	case 'ITEM':
 	  console.log("ITEM: "); console.log(item)
+	  res.write('Adding the following AD Group mapping to Room "'+inp2+'":')
+	  res.write("<table border='1'><tr><td>Nr</td><td>CN</td><td>"
+		+"AccountID</td><td>Mail</td><td>DN</td></tr></table>");
 	  res.write("<table border='1'><tr><td>"+item.entry+"</td><td>"+item.cn+"</td><td>"
 		+item.accountid+"</td><td>"+item.mail+"</td><td>"+item.dn
 		+"</td></tr></table>");
+
+	  dbgroups.insert(item, {w:1}, function (err, obj) { 
+	    if(err.code == 11000) {
+		dbgroups.findOne({"guid":item.guid}, function (err, dup) { 
+		  if(err) throw err;	// err shouldnt happen here... prob
+//		  console.log(dup)
+		  dbgroups.remove({"guid":item.guid}, {w:1}, function (err, n) {
+			if(err) console.log(err);
+			console.log("Removed "+n+" docs for guid "+item.guid)
+//			item["entry"]=99	//debug
+			dbgroups.insert(item, {w:1}, function (err, obj) {
+			  if(err) throw err;
+			  res.write("Updated existing group "+item.cn+"<br/>")
+			});
+		  });
+		});
+//		res.write("dup "+ err.name+": "+err.message)
+		console.log("dup "+ err.name+": "+err.message)
+	    }
+	    else if(err) {
+		res.write(err.name+": "+err.message)
+		console.log(err.name+": "+err.message)
+		console.log(err)
+	    }
+
+//	    console.log(obj._id)
+		//  dbmaps.insert(item.object, {w:1}, function (err, objects) { if(err) throw err; })
+		
+	  });
 	  break;
 	case 'END':
 //	  console.log(" END "); //console.log(item)
 	  res.write("Found "+item.entry+" entries<br/>")
-	  res.end();
+	  var timer = setTimeout(function() {res.end()}, 500)
 	  break;
 	default:
 	  console.log(event.name+": "+event.message)
