@@ -1,6 +1,6 @@
 {
-  "server": "example.com",
-  "port": 389,
+  "server": "localhost",
+  "port": 1389,
   "username": "user",
   "password": "secret",
   "baseDN": "dc=example,dc=com",
