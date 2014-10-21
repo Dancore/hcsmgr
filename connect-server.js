@@ -322,23 +322,51 @@ app.get("/newtoken", function(req, res) {
     });
   });
 })
-app.get('/rooms', function(req, res) {
+
+app.get('/syncrooms', bodyparser.urlencoded({extended: false}), function(req, res) {
+  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+  res.write('<a href="/">Back</a><br/>')
+  res.write("<table border='1'><tr><td></td><td>Room</td><td>"
+  +"Group DN</td></tr></table>");
+
+  dbrooms.find().sort({name: 1}).each(function(err, roommap) {
+    if(err) throw err;
+    if(roommap) {
+      console.log(roommap)
+      res.write("<table border='1'><tr><td>"+roommap.name+"</td><td>"+roommap.group
+    +"</td></tr></table>");
+    }
+    else {
+      // res.write("end")
+      res.end()
+    }
+  });
+})
+function prepToken(callback) {
   var T = new Date()
   var timestamp = T.getTime() // milliseconds
   dbtokens.find().sort({$natural:-1}).limit(1).nextObject(function (err, doc) {
     if(err) throw err
-    if(doc.validto < timestamp -100){
+    if(doc.validto < timestamp){
       console.log("INFO: token is invalid "+doc.validto+" < "+timestamp)
       console.log("Requesting new token")
-      getToken(function(err, obj) { if(err) throw err })
+      getToken(function(err, obj) { 
+        if(err) return callback(err);
+        callback(null, doc)
+      })
     }
     else {
       console.log("token validto "+doc.validto)
       console.log("     now time "+timestamp)
+      callback(null, doc)
     }
+  });
+}
+app.get('/rooms', function(req, res) {
+  prepToken(function(err, tok){
 
     var endpoint = "http://"+settings.hcs+"/v2/"
-    var hipchatter = new Hipchatter(doc.access_token, endpoint);
+    var hipchatter = new Hipchatter(tok.access_token, endpoint);
     // this will list all of your rooms
     hipchatter.rooms(function(err, rooms){
     	if(err) {
@@ -352,6 +380,7 @@ app.get('/rooms', function(req, res) {
     	res.write("<a href='/'>Back</a><br/>")
     	res.write("List of rooms in HipChat Server ("+endpoint+")<br/><br/>")
     	rooms.forEach(function (room, i, arr) {
+        // console.log(room)
     	  res.write(room.id+" "+room.name+" ")
     	  var url = room.links.self
     	  res.write("<a href='"+url+"'>"+url+"</a>")
@@ -477,6 +506,7 @@ tokreq = http.request(options, function(res) {
     json["validto"] = timestamp + json.expires_in*1000
 
     console.log("token is: "+json.access_token)
+    console.log("time is: "+timestamp)
     console.log("Now accessing "+settings.hcs+"/v2")
 
     dbtokens.insert(json, {w:1}, function (err, objects) { 
