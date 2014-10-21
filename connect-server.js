@@ -330,7 +330,7 @@ app.get('/rooms', function(req, res) {
     if(doc.validto < timestamp -100){
       console.log("INFO: token is invalid "+doc.validto+" < "+timestamp)
       console.log("Requesting new token")
-      // getToken(function(err, obj) { if(err) throw err })
+      getToken(function(err, obj) { if(err) throw err })
     }
     else {
       console.log("token validto "+doc.validto)
@@ -474,7 +474,7 @@ tokreq = http.request(options, function(res) {
 
     var T = new Date()
     var timestamp = T.getTime()
-    json["validto"] = timestamp + json.expires_in
+    json["validto"] = timestamp + json.expires_in*1000
 
     console.log("token is: "+json.access_token)
     console.log("Now accessing "+settings.hcs+"/v2")
