@@ -386,11 +386,12 @@ app.post('/install', jsonParser, function(req, res) {
   res.end()
 
   dboauth.find().nextObject(function (err, doc) {
-  	req.body["_id"] = doc._id
+    if(doc)   // may be null object (first time)
+      req.body["_id"] = doc._id
   	console.log(req.body)
   	dboauth.save(req.body, {w:1}, function(err, obj) {
-          if(err) throw err;
-	  getToken()
+      if(err) throw err;
+      getToken()
   	});
   });
 });
