@@ -157,6 +157,7 @@ app.get('/', function(req, res) {
   res.write("<a href='/rooms'>List of rooms</a> currently in HipChat Server<br/>")
   res.write("<a href='/groupmap'>Show room/group mapping</a><br/>")
   res.write("<a href='/newtoken'>New token</a> force a new token from HCS<br/><br/>")
+  res.write("<a href='/syncrooms'>sync</a> force sync of room/group map to HCS<br/><br/>")
   res.write(form1)
   res.write(form2)
   res.write("</body></html>")
@@ -323,23 +324,73 @@ app.get("/newtoken", function(req, res) {
   });
 })
 
-app.get('/syncrooms', bodyparser.urlencoded({extended: false}), function(req, res) {
-  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-  res.write('<a href="/">Back</a><br/>')
-  res.write("<table border='1'><tr><td></td><td>Room</td><td>"
-  +"Group DN</td></tr></table>");
+function createroom(docs, hipchatter) {
+  for(i = 0; i < docs.length; i++) {
+    var q = {name: docs[i].name, owner_user_id: 1}
+    hipchatter.create_room(q, function(err, room){
+      if(err) console.log(err)
+      console.log(room);
+    });
+  }
+}
 
-  dbrooms.find().sort({name: 1}).each(function(err, roommap) {
-    if(err) throw err;
-    if(roommap) {
-      console.log(roommap)
-      res.write("<table border='1'><tr><td>"+roommap.name+"</td><td>"+roommap.group
-    +"</td></tr></table>");
-    }
-    else {
-      // res.write("end")
-      res.end()
-    }
+app.get('/syncrooms', bodyparser.urlencoded({extended: false}), function(req, res) {
+  prepToken(function(err, tok){
+
+    var endpoint = "http://"+settings.hcs+"/v2/"
+    var hipchatter = new Hipchatter(tok.access_token, endpoint);
+    // this will list all of your rooms
+    dbrooms.find().sort({name:1}).toArray(function (err, docs) {
+      // var filtered = docs.filter(roomexist)
+      console.log(docs);
+      for(i = 0; i < docs.length; i++) {
+        
+        // {privacy: 'private', is_archived: false, is_guest_accessible: false, topic: '', owner: {id: 1}}
+        // console.log(q)
+        hipchatter.delete_room(docs[i].name, function(err, room){
+          if(err) console.log(err)
+        })
+        
+        
+      }
+      setTimeout(createroom(docs, hipchatter), 1000)
+    })
+
+
+    hipchatter.rooms(function(err, rooms){
+      if(err) {
+        console.error(err)
+        res.end(err.name+": "+err.message)
+        return;
+      }
+      //console.log(rooms)
+      //  res.writeHead(200, { 'content-type': 'text/plain' })
+      res.write('<html><body>')
+      res.write("<a href='/'>Back</a><br/>")
+      res.write("List of rooms in HipChat Server ("+endpoint+")<br/><br/>")
+
+
+      rooms.forEach(function (room, i, arr) {
+        // console.log(room)
+        res.write(room.id+" "+room.name+" ")
+        var url = room.links.self
+        res.write("<a href='"+url+"'>"+url+"</a>")
+        res.write("<br/>")
+        // var q = {name: room.name}
+        // console.log(q)
+        // dbrooms.findOne(q, function(err, map) {
+
+        //   if(err) throw err;
+        //   if(map === null) {
+        //     console.log(room.name + " is not in map")
+        //   } else {
+        //     console.log(room.name +" = "+ map.name)
+        //   }
+        // })
+      });
+      res.write("</body></html>")
+      res.end();
+    });
   });
 })
 function prepToken(callback) {
@@ -380,7 +431,7 @@ app.get('/rooms', function(req, res) {
     	res.write("<a href='/'>Back</a><br/>")
     	res.write("List of rooms in HipChat Server ("+endpoint+")<br/><br/>")
     	rooms.forEach(function (room, i, arr) {
-        // console.log(room)
+        console.log(room)
     	  res.write(room.id+" "+room.name+" ")
     	  var url = room.links.self
     	  res.write("<a href='"+url+"'>"+url+"</a>")
@@ -523,7 +574,7 @@ tokreq.on('error', function(e) {
 });
 
 // write data to request body
-tokreq.write("grant_type=client_credentials&scope=view_group+admin_room");
+tokreq.write("grant_type=client_credentials&scope=view_group+admin_room+manage_rooms");
 tokreq.end();
 
 });  //find

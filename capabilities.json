@@ -21,7 +21,8 @@
         "admin_room",
         "view_group",
         "admin_group",
-        "send_notification"
+        "send_notification",
+        "manage_rooms"
       ]
     }
   }
