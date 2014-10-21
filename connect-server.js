@@ -190,49 +190,60 @@ app.post('/groupmap', bodyparser.urlencoded({extended: false}), function(req, re
     res.write('Room/Group missing<br/>')
     return res.end();
   }
+  else
+  {
+    var map = {}
+    map["name"] = inp2
+    map["group"] = inp1
+    updateroom(map, function(err, obj) {
+      if(err) return res.end(err.name+": "+err.message)
+      res.write("Added/updated room "+map.name+"/"+map.group+"<br/>")
+      return res.end()
+    });
+  }
 
 //  res.write('trying...<br/>')
-  var filter = '(&(objectclass=group)(member=*))';
+  // var filter = '(&(objectclass=group)(member=*))';
 
-  ldapsearch(inp1, filter, 1, function (event, item) {
-    console.log("typeof: "+typeof(event))
-    switch(event) {
-	case 'ITEM':
-	  console.log("ITEM: "); console.log(item)
-	  res.write('Adding the following AD Group mapping to Room "'+inp2+'":')
-	  res.write("<table border='1'><tr><td>Nr</td><td>CN</td><td>"
-		+"AccountID</td><td>Mail</td><td>DN</td></tr></table>");
-	  res.write("<table border='1'><tr><td>"+item.entry+"</td><td>"+item.cn+"</td><td>"
-		+item.accountid+"</td><td>"+item.mail+"</td><td>"+item.dn
-		+"</td></tr></table>");
+  // ldapsearch(inp1, filter, 1, function (event, item) {
+  //   console.log("typeof: "+typeof(event))
+  //   switch(event) {
+  //     case 'ITEM':
+  //       console.log("ITEM: "); console.log(item)
+  //       res.write('Adding the following AD Group mapping to Room "'+inp2+'":')
+  //       res.write("<table border='1'><tr><td>Nr</td><td>CN</td><td>"
+  //       +"AccountID</td><td>Mail</td><td>DN</td></tr></table>");
+  //       res.write("<table border='1'><tr><td>"+item.entry+"</td><td>"+item.cn+"</td><td>"
+  //       +item.accountid+"</td><td>"+item.mail+"</td><td>"+item.dn
+  //       +"</td></tr></table>");
 
-//	  item["rooms"]=99
-	  updategroup(item, function(err, obj) {
-	    if (err) { 
-		return res.write(err.name+": "+err.message)
-	    } //else {
+  //       //	  item["rooms"]=99
+  //       updategroup(item, function(err, obj) {
+  //         if (err) { 
+  //       return res.write(err.name+": "+err.message)
+  //         } //else {
 
-	    res.write("Added/updated group "+item.cn+"<br/>")
-	    var room = { "cn": item.cn, "name": inp2 }
-	    updateroom(room, function(err, obj) {
-		if(err) return res.write(err.name+": "+err.message)
-		res.write("Added/updated room "+room.name+"<br/>")
-	    });
-	  });
+  //         res.write("Added/updated group "+item.cn+"<br/>")
+  //         var room = { "cn": item.cn, "name": inp2 }
+  //         updateroom(room, function(err, obj) {
+  //           if(err) return res.write(err.name+": "+err.message)
+  //           res.write("Added/updated room "+room.name+"<br/>")
+  //         });
+  //       });
 
-	//  dbmaps.insert(item.object, {w:1}, function (err, objects) { if(err) throw err; })
-		
-	  break;
-	case 'END':
-//	  console.log(" END "); //console.log(item)
-	  res.write("Found "+item.entry+" entries<br/>")
-	  var timer = setTimeout(function() {res.end()}, 500)
-	  break;
-	default:
-	  console.log(event.name+": "+event.message)
-	  res.end(event.name+": "+event.message)
-    }
-  });
+  //       //  dbmaps.insert(item.object, {w:1}, function (err, objects) { if(err) throw err; })
+
+  //       break;
+  //     case 'END':
+  //       //	  console.log(" END "); //console.log(item)
+  //       res.write("Found "+item.entry+" entries<br/>")
+  //       var timer = setTimeout(function() {res.end()}, 500)
+  //       break;
+  //       default:
+  //       console.log(event.name+": "+event.message)
+  //       res.end(event.name+": "+event.message)
+  //   }
+  // });
 
 //  db.groups.insert
 
@@ -242,26 +253,25 @@ function updateroom(item, callback)
 {
   dbrooms.insert(item, {w:1}, function (err, obj) { 
     if(err && err.code == 11000) {
-	dbrooms.findOne({"name":item.name}, function (err, dup) { 
-	  if(err) throw err;	// err shouldnt happen here... prob
-//	  console.log(dup)
-	  dbrooms.remove({"name":item.name}, {w:1}, function (err, n) {
-		if(err) console.log(err);
-		console.log("Removed "+n+" docs for cn "+item.cn)
-//		item["entry"]=99	//debug
-		dbrooms.insert(item, {w:1}, function (err, obj) {
-		  if(err) throw err;
-		  return callback(null, obj)
-		});
-	  });
-	});
-//	res.write("dup "+ err.name+": "+err.message)
-	console.log("dup "+ err.name+": "+err.message)
+    	dbrooms.findOne({"name":item.name}, function (err, dup) {
+    	  if(err) throw err;	// err shouldnt happen here... prob
+    //	  console.log(dup)
+    	  dbrooms.remove({"name":item.name}, {w:1}, function (err, n) {
+      		if(err) console.log(err);
+      		console.log("Removed "+n+" duplicate docs for "+item.name)
+      //		item["entry"]=99	//debug
+      		dbrooms.insert(item, {w:1}, function (err, obj) {
+      		  if(err) throw err;
+      		  return callback(null, obj)
+      		});
+    	  });
+      });
+      // console.log("dup "+ err.name+": "+err.message)
     }
     else if(err) {
-	console.log(err.name+": "+err.message)
-	console.log(err)
-	return callback(err)
+    	console.log(err.name+": "+err.message)
+    	console.log(err)
+    	return callback(err)
     }
     else
       return callback(null, obj)
