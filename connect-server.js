@@ -311,37 +311,54 @@ function updategroup(item, callback)
 }
 
 app.get("/newtoken", function(req, res) {
-//  res.writeHead(200, { 'Content-Type': 'application/json' })
-//  getToken();
-  dbtokens.find().sort({$natural:1}).each(function (err, doc) {
-    res.end(JSON.stringify(doc))
+  res.writeHead(200, { 'Content-Type': 'text/html' })
+  getToken(function(err, obj){
+    if(err) return console.error(err)
+    dbtokens.find().sort({$natural:1}).toArray(function (err, docs) {
+      for(i = 0; i < docs.length; i++){
+        res.write(i+": "+JSON.stringify(docs[i])+"<br/>\n")
+      }
+      res.end()
+    });
   });
 })
 app.get('/rooms', function(req, res) {
+  var T = new Date()
+  var timestamp = T.getTime() // milliseconds
   dbtokens.find().sort({$natural:-1}).limit(1).nextObject(function (err, doc) {
     if(err) throw err
+    if(doc.validto < timestamp -100){
+      console.log("INFO: token is invalid "+doc.validto+" < "+timestamp)
+      console.log("Requesting new token")
+      // getToken(function(err, obj) { if(err) throw err })
+    }
+    else {
+      console.log("token validto "+doc.validto)
+      console.log("     now time "+timestamp)
+    }
+
     var endpoint = "http://"+settings.hcs+"/v2/"
     var hipchatter = new Hipchatter(doc.access_token, endpoint);
     // this will list all of your rooms
     hipchatter.rooms(function(err, rooms){
-	if(err) {
-	  console.error(err)
-	  res.end(err.name+": "+err.message)
-	  return;
-	}
-	//console.log(rooms)
-	//  res.writeHead(200, { 'content-type': 'text/plain' })
-	res.write('<html><body>')
-	res.write("<a href='/'>Back</a><br/>")
-	res.write("List of rooms in HipChat Server ("+endpoint+")<br/><br/>")
-	rooms.forEach(function (room, i, arr) {
-	  res.write(room.id+" "+room.name+" ")
-	  var url = room.links.self
-	  res.write("<a href='"+url+"'>"+url+"</a>")
-	  res.write("<br/>")
-	});
-	res.write("</body></html>")
-	res.end();
+    	if(err) {
+    	  console.error(err)
+    	  res.end(err.name+": "+err.message)
+    	  return;
+    	}
+    	//console.log(rooms)
+    	//  res.writeHead(200, { 'content-type': 'text/plain' })
+    	res.write('<html><body>')
+    	res.write("<a href='/'>Back</a><br/>")
+    	res.write("List of rooms in HipChat Server ("+endpoint+")<br/><br/>")
+    	rooms.forEach(function (room, i, arr) {
+    	  res.write(room.id+" "+room.name+" ")
+    	  var url = room.links.self
+    	  res.write("<a href='"+url+"'>"+url+"</a>")
+    	  res.write("<br/>")
+    	});
+    	res.write("</body></html>")
+    	res.end();
     });
   });
 })
@@ -403,7 +420,7 @@ app.post('/install', jsonParser, function(req, res) {
   	console.log(req.body)
   	dboauth.save(req.body, {w:1}, function(err, obj) {
       if(err) throw err;
-      getToken()
+      getToken(function(err, obj) { if(err) throw err })
   	});
   });
 });
@@ -427,7 +444,7 @@ function tryParseJSON (jsonString, callb){
 };
 
 // get a new Token and save it to DB:
-function getToken()
+function getToken(callback)
 {
 var tokreq;
 
@@ -452,7 +469,7 @@ tokreq = http.request(options, function(res) {
     console.log('token BODY: ' + chunk);
 
     var json = tryParseJSON(chunk, function(err) {
-	if(err) throw err;
+      if(err) throw err;
     });
 
     var T = new Date()
@@ -462,13 +479,17 @@ tokreq = http.request(options, function(res) {
     console.log("token is: "+json.access_token)
     console.log("Now accessing "+settings.hcs+"/v2")
 
-    dbtokens.insert(json, {w:1}, function (err, objects) { if(err) throw err; })
+    dbtokens.insert(json, {w:1}, function (err, objects) { 
+      if(err) throw err; 
+      callback(null, objects)
+    })
 
   });
 });
 
 tokreq.on('error', function(e) {
   console.log('problem with request: ' + e.message);
+  return callback(e)
 });
 
 // write data to request body
