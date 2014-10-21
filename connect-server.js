@@ -165,18 +165,20 @@ app.get('/', function(req, res) {
 app.get('/groupmap', bodyparser.urlencoded({extended: false}), function(req, res) {
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
   res.write('<a href="/">Back</a><br/>')
-  res.write("<table border='1'><tr><td>Nr</td><td>CN</td><td>"
-	+"AccountID</td><td>Mail</td><td>DN</td></tr></table>");
+  res.write("<table border='1'><tr><td></td><td>Room</td><td>"
+	+"Group DN</td></tr></table>");
 
-  dbrooms.find().sort({name: 1}).each(function(err, room) {
+  dbrooms.find().sort({name: 1}).each(function(err, roommap) {
     if(err) throw err;
-    if(room) {
-  	console.log(room)
-    	res.write("<table border='1'><tr><td>"+room.name+"</td><td>"+room.cn+"</td><td>"
+    if(roommap) {
+  	  console.log(roommap)
+    	res.write("<table border='1'><tr><td>"+roommap.name+"</td><td>"+roommap.group
 	  +"</td></tr></table>");
-//	  +item.accountid+"</td><td>"+item.mail+"</td><td>"+item.dn
     }
-    else res.end()
+    else {
+      // res.write("end")
+      res.end()
+    }
   });
 })
 app.post('/groupmap', bodyparser.urlencoded({extended: false}), function(req, res) {
