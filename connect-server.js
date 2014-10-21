@@ -49,8 +49,10 @@ var ldap = ldapjs.createClient({url: 'ldap://'+ldapserver+':'+ldapport});
 
 console.log("INFO: Binding to server ldap://"+ldapserver+":"+ldapport)
 ldap.bind(ldapusername, ldappassword, function(err) {
-  if(err)
-    console.log(err);
+  if(err){
+    console.log("ERROR: Wrong LDAP user/password\n" +err);
+    process.exit(0)
+  }
   else
     console.log('LDAP authenticated');
 });
@@ -69,7 +71,10 @@ var json = tryParseJSON(jsonstr, function(err) {
 
 console.log("INFO: connecting to MongoDB")
 MongoClient.connect('mongodb://127.0.0.1:27017/hcsmgr', function(err, database) {
-  if(err) throw err;
+  if(err) {
+    console.log("oops")
+    throw err;
+  }
   db = database;
   db.createCollection('rooms', function(err, coll){
         if(err) throw err;
