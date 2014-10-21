@@ -1,7 +1,7 @@
 {
   "links": {
-    "self": "http://se06orgcrowt01:8180/capabilities",
-    "homepage": "http://se06orgcrowt01/"
+    "self": "http://192.168.8.8:8180/capabilities",
+    "homepage": "http://192.168.8.8/"
   },
   "key": "hipchat.manager.app",
   "name": "HipChat Management Add-on",
@@ -14,7 +14,7 @@
     "installable": {
       "allowGlobal": true,
       "allowRoom": false,
-      "callbackUrl": "http://se06orgcrowt01:8180/install"
+      "callbackUrl": "http://192.168.8.8:8180/install"
     },
     "hipchatApiConsumer": {
       "scopes": [
